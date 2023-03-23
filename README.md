@@ -99,6 +99,30 @@ Subscription App contract : 0x445F89C5555eb652b993dbA9f118acDE6C65d5D2
 
 
 
+## Base EVM 
+
+
+### General sanction AML 
+
+- Molecule Address AML contract : 0xa944660A9cc7D77836F44955Afa11b0730699487
+
+- Molecule Logic Address US sanction list : 0xBF864B1b8C151C6C5b8ED5104cb6D4a238Edb7B4 ---- 840
+
+- Molecule Logic Address UK sanction list : 0xf5FCAe2210EFe5B35804ACc11D4Ca34dF8F637C4 ---- 826
+
+- Molecule Logic Address China sanction list : ----- 156
+
+- Molecule Logic Address Russia sanction List : ---- 643
+
+
+### Custom AllowList details 
+
+- Molecule Address Custom Allowlist contract : 0x971b3fE9d46f0F54e8C3ab3fdeA5fdfC9d2C5C30
+
+- Logic Address user Allowlist contract : 0x46A3C9C08a250AfdaeD679addc50bF61C8F8Be37
+
+
+
 
 
 

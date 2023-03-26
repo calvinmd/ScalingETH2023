@@ -32,7 +32,7 @@ Moreover, the Molecule-based access control can be applicable for more complex l
 
 
 
-## Deplyment details 
+## Deployment details
 
 ## Goerli 
 
@@ -47,6 +47,21 @@ Moreover, the Molecule-based access control can be applicable for more complex l
 Molecule Logic Address China sanction list : [0x2Bd642FED344D36272306b6aE0F1c9104479e217](https://goerli.etherscan.io/address/0x2Bd642FED344D36272306b6aE0F1c9104479e217) ----- ID : 156
 
 Molecule Logic Address Russia sanction List : [0xF1AD957f2846c1050e61582b01CEff1A7f74dD7D](https://goerli.etherscan.io/address/0x2Bd642FED344D36272306b6aE0F1c9104479e217) ---- ID : 643
+
+
+### Subscription Contracts on Goerli
+
+*Subscription Smart Contract*
+
+- Subscription Allowlist: [0xbc556d9f36FFc359F5b3EC814B296de8945E9E45](https://goerli.etherscan.io/address/0xbc556d9f36ffc359f5b3ec814b296de8945e9e45#writeContract)
+
+*AML Deployments*
+
+- Molecule AML Deployment: [0x1D2048b4673a7D3C874D5Ca0cB584695Fcc4CC7e](https://goerli.etherscan.io/address/0x1d2048b4673a7d3c874d5ca0cb584695fcc4cc7e)
+
+- US Sanction List: [0x36fcB28EA4F1a227F6FB17005046b59Fb164BEA1](https://goerli.etherscan.io/address/0x36fcb28ea4f1a227f6fb17005046b59fb164bea1)
+
+- EU Sanction List: [0xAB73E85dd23f87E205D1C7C2354a372C3841c829](https://goerli.etherscan.io/address/0xab73e85dd23f87e205d1c7c2354a372c3841c829)
 
 
 ### Custom AllowList details 

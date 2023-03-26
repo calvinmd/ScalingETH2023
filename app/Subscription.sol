@@ -1,97 +1,116 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
 
+pragma solidity ^0.8.17;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
+import "@moleculeprotocol/molecule-core/src/ILogicAddress.sol";
 import "@moleculeprotocol/molecule-core/src/IMoleculeAddress.sol";
 
-contract Subscription {
-    struct Category {
-        uint ethRequired;
-        uint pointsGiven;
-    }
-    mapping(uint => Category) public categories;
-    mapping(address => uint) public userPoints;
-    mapping(address => uint) public userCategory;
-    mapping(address => bool) public isSubscribed;
-    event Subscribed(
-        address indexed user,
-        uint indexed category,
-        uint ethPaid,
-        uint pointsGiven
-    );
+// Only accept ETH for now
+// Each address can only have 1 token
+// Exact mint price is needed for subscription
+// Modified EIP-5643 reference implementation: https://eips.ethereum.org/EIPS/eip-5643
+// -- tokenId is not relevant, checks are on user address instead
+// -- use Molecule Logic Interface for validity check: checks NFT existence and expiration
+// -- disallow subscription if user is sanctioned
+// -- NFT is actually optional, but it allows subscription to show up on OpenSea/Marketplaces
+//    and able to show up in user's NFT portfolio
+contract Subscription is ERC721, ILogicAddress, Ownable {
+    using Counters for Counters.Counter;
+    Counters.Counter private _tokenIds;
+
+    uint256 public _price;
+    uint64 public _duration;
+    bool public _renewable;
+
+    address public _molecule;
+
+    // EIP-5643 reference implementation modified
+    // owner address to experiation date
+    mapping(address => uint64) public _expirations;
+
+    event PriceUpdated(uint256 mintPrice);
+    event DurationUpdated(uint256 duration);
+    event Renewable(bool renewable);
+    event MoleculeUpdated(address molecule);
+    event Subscribed(address indexed user, uint64 expiration);
     event Unsubscribed(address indexed user);
-    event Redeemed(address indexed user, uint pointsUsed);
-    event ETHWithdrawn(address indexed owner, uint amount);
-    address private _owner;
-    address private _molecule_address_general_AML =
-        0x692f0Ac3eDDF405C8a864643DC104b3B01F594C2;
-    address private _molecule_address_access_list =
-        0x692f0Ac3eDDF405C8a864643DC104b3B01F594C2;
 
-    constructor() {
-        _owner = msg.sender;
+    constructor() ERC721("Sample Molecule Subscription", "SUB") {
+      // Set the subscription settings
+      updatePrice(0.001 ether);
+      updateDuration(30 days);
+      updateRenewable(true);
     }
 
-    modifier onlyOwner() {
-        require(
-            msg.sender == _owner,
-            "Only contract owner can call this function"
-        );
-        _;
+    // Molecule Logic function
+    function check(address user) public view override returns (bool) {
+        bool isSubscriber = IERC721(address(this)).balanceOf(user) > 0;
+        bool hasExpired = _expirations[user] < block.timestamp;
+        return isSubscriber && !hasExpired;
     }
 
-    function setCategory(
-        uint categoryId,
-        uint ethRequired,
-        uint pointsGiven
-    ) external onlyOwner {
-        categories[categoryId] = Category(ethRequired, pointsGiven);
-    }
-
-    function subscribe(uint categoryId) external payable {
-        require(
-            IMoleculeAddress(_molecule_address_general_AML).check(msg.sender),
-            "Molecule AML : access denied "
-        );
-        require(
-            IMoleculeAddress(_molecule_address_access_list).check(msg.sender),
-            "Molecule Allowlist : access denied "
-        );
-        Category memory category = categories[categoryId];
-        require(category.ethRequired > 0, "Invalid category");
-        require(!isSubscribed[msg.sender], "Already subscribed");
-        require(msg.value == category.ethRequired, "Invalid amount");
-        uint points = category.pointsGiven;
-        userCategory[msg.sender] = categoryId;
-        userPoints[msg.sender] += points;
-        isSubscribed[msg.sender] = true;
-        emit Subscribed(msg.sender, categoryId, msg.value, points);
-    }
-
-    function unsubscribe() external {
-        require(isSubscribed[msg.sender], "Not subscribed");
-        uint points = userPoints[msg.sender];
-        userPoints[msg.sender] = 0;
-        userCategory[msg.sender] = 0;
-        isSubscribed[msg.sender] = false;
-        emit Unsubscribed(msg.sender);
-        if (points > 0) {
-            emit Redeemed(msg.sender, points);
+    // Allow anybody to subscribe or renew for a user
+    function subscribe(address user) public payable {
+        // Allow deferred Molecule controller deployment
+        if (_molecule != address(0)) {
+          require(IMoleculeAddress(_molecule).check(user), "User is sanctioned");
         }
+        require(user != address(0), "Invalid address");
+        // Only exact amount is accepted
+        require(msg.value == _price, "Incorrect amount of Ether sent");
+
+        // If the user does not have a subscription, mint a new NFT
+        if (IERC721(address(this)).balanceOf(user) == 0) {
+          _tokenIds.increment();
+          uint256 newTokenId = _tokenIds.current();
+          _safeMint(user, newTokenId);
+          _expirations[user] = uint64(block.timestamp + _duration);
+        } else {
+          // If the user has a subscription, check if it is renewable
+          require(_renewable, "Subscription is not renewable");
+          _expirations[user] += _duration;
+        }
+
+        // Subscribe or renew emits the same event
+        emit Subscribed(user, _expirations[user]);
     }
 
-    function redeem() external {
-        require(isSubscribed[msg.sender], "Not subscribed");
-        uint points = userPoints[msg.sender];
-        require(points >= 10, "Insufficient points");
-        userPoints[msg.sender] -= 10;
-        emit Redeemed(msg.sender, 10);
+    function unsubscribe() public {
+        require(IERC721(address(this)).balanceOf(msg.sender) > 0, "User does not have a subscription");
+        require(_expirations[msg.sender] > block.timestamp, "Subscription has already expired");
+
+        // We do NOT burn the NFT, only update the expirations
+        _expirations[msg.sender] = 0;
+        emit Unsubscribed(msg.sender);
     }
 
-    function withdrawETH(address payable destination) external onlyOwner {
-        uint balance = address(this).balance;
-        require(balance > 0, "No balance to withdraw");
-        (bool success, ) = destination.call{value: balance}("");
-        require(success, "Failed to withdraw ETH");
-        emit ETHWithdrawn(_owner, balance);
+    // Owner only functions
+    // Function to update the mint price
+    function updatePrice(uint256 price) public onlyOwner {
+        _price = price;
+        emit PriceUpdated(price);
+    }
+
+    function updateDuration(uint64 duration) public onlyOwner {
+        _duration = duration;
+        emit DurationUpdated(duration);
+    }
+
+    function updateRenewable(bool renewable) public onlyOwner {
+        _renewable = renewable;
+        emit Renewable(renewable);
+    }
+
+    function updateMolecule(address molecule) public onlyOwner {
+        _molecule = molecule;
+        emit MoleculeUpdated(molecule);
+    }
+
+    // Function to withdraw the Ether collected from subscriptions
+    function withdraw() public onlyOwner {
+        payable(msg.sender).transfer(address(this).balance);
     }
 }
